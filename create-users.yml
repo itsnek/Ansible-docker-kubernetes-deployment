@@ -1,9 +1,11 @@
 - hosts: server
   become: true
+  vars_files: 
+    - default.yml 
   tasks:
     - name: create user
       user: 
-        name: "{{ users }}" 
+        name: "{{users}}" 
         append: yes 
         state: present 
         createhome: yes 

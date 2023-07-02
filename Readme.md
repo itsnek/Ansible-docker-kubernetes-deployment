@@ -10,7 +10,7 @@
 - 1 worker node
 
 ## Steps
-1. Configure hosts.yml to contain the appropriate ip addresses, as well as users for the nodes. In this case we have created an explicit docker/kubernetes user, "duser/kuser", with sudo priviledges, by executing the command: ` ansible-playbook create-user.yml -i hosts.yml -K `
+1. Configure hosts.yml to contain the appropriate ip addresses, as well as users for the nodes. In this case we have created an explicit docker/kubernetes user, "duser/kuser", with sudo priviledges, by executing the command: ` ansible-playbook create-users.yml -i hosts.yml -K `
 2. (Optional) Modify the dkb-playbook.yml to add any extra needed system package.
 3. Make sure that you can perform a ssh connection to the nodes.
 4. Either do "eval \`ssh-agent\` && ssh-ad" or add --ask-pass in the next command(it may need ssh-pass package).
