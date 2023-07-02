@@ -1,0 +1,21 @@
+- hosts: server
+  become: true
+  tasks:
+    - name: create user
+      user: 
+        name: "{{ users }}" 
+        append: yes 
+        state: present 
+        createhome: yes 
+        shell: /bin/bash
+
+    - name: allow new user to have passwordless sudo
+      lineinfile:
+        dest: /etc/sudoers
+        line: '{{users}} ALL=(ALL) NOPASSWD: ALL'
+        validate: 'visudo -cf %s'
+
+    - name: set up authorized keys for the duser user
+      authorized_key: user={{users}} key="{{key}}"
+      with_file:
+        key: ~/.ssh/id_rsa.pub  
