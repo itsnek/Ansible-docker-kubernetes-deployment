@@ -3,7 +3,7 @@
 #################################################
 ---
 
-- hosts: server
+- hosts: all
   become: true
   name: Docker installation
   vars_files:
@@ -51,7 +51,7 @@
         enabled: yes
         
 
-- hosts: server
+- hosts: all
   become: true
   name: Kubernetes installation
   vars_files: 
@@ -89,7 +89,7 @@
       shell: systemctl restart containerd.service
 
 
-- hosts: master
+- hosts: all
   become: yes
   gather_facts: false
   name: Initialize and set up the cluster and master node 

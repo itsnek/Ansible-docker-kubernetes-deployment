@@ -1,23 +1,29 @@
-- hosts: server
+- hosts: all
   become: true
   vars_files: 
-    - default.yml 
+    - default.yml
+  vars:
+    users: 
+      - { 'Username': 'duser', 'Key': '~/.ssh/id_rsa.pub' }
+      - { 'Username': 'kuser', 'Key': '~/.ssh/id_rsa.pub' }
+
   tasks:
     - name: create user
       user: 
-        name: "{{users}}" 
+        name: "{{item['Username']}}" 
         append: yes 
         state: present 
         createhome: yes 
         shell: /bin/bash
+      loop: "{{users}}"
 
     - name: allow new user to have passwordless sudo
       lineinfile:
         dest: /etc/sudoers
-        line: '{{users}} ALL=(ALL) NOPASSWD: ALL'
+        line: '{{item["Username"]}} ALL=(ALL) NOPASSWD: ALL'
         validate: 'visudo -cf %s'
+      loop: "{{users}}"
 
-    - name: set up authorized keys for the duser user
-      authorized_key: user={{users}} key="{{key}}"
-      with_file:
-        key: ~/.ssh/id_rsa.pub  
+    - name: set up authorized keys for the new user
+      authorized_key: user="{{item['Username']}}" key="{{lookup('file', item['Key'])}}"
+      loop: "{{users}}"
