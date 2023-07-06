@@ -70,13 +70,13 @@
        
     - name: install kubelet
       apt:
-        name: kubelet=1.24.5-00
+        name: kubelet=1.26.0-00
         state: present
         update_cache: true
 
     - name: install kubeadm
       apt:
-        name: kubeadm=1.24.5-00
+        name: kubeadm=1.26.0-00
         state: present
 
     - name: disable swap
@@ -89,7 +89,7 @@
       shell: systemctl restart containerd.service
 
 
-- hosts: all
+- hosts: master
   become: yes
   gather_facts: false
   name: Initialize and set up the cluster and master node 
@@ -109,7 +109,7 @@
 
     - name: create .kube directory
       become: yes
-      become_user: nek
+      become_user: kuser
       file:
         path: $HOME/.kube
         state: directory
@@ -118,9 +118,9 @@
     - name: copy admin.conf to user's kube config
       copy:
        src: /etc/kubernetes/admin.conf
-       dest: /home/nek/.kube/config
+       dest: /home/kuser/.kube/config
        remote_src: yes
-       owner: nek
+       owner: kuser
     
     - name: Pause for 1 minute to build app cache
       ansible.builtin.pause:
@@ -128,7 +128,7 @@
     
     - name: install Pod network
       become: yes
-      become_user: nek
+      become_user: kuser
       shell: kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml >> pod_network_setup.txt  # https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
       args:
         chdir: $HOME
@@ -149,12 +149,12 @@
     - name: Store join command
       action: copy content="{{ join_command }}" dest="/etc/kubernetes/join.command"
     
-# - hosts: worker
-#   become: yes
-#   name: Add a worker node in kubernetes cluster
-#   tasks:
-#     - name: join cluster
-#       shell: "{{ hostvars['master'].join_command }} >> node_joined.txt"
-#       args:
-#         chdir: $HOME
-#         creates: node_joined.txt
+- hosts: worker
+  become: yes
+  name: Add a worker node in kubernetes cluster
+  tasks:
+    - name: join cluster
+      shell: "{{ hostvars['master'].join_command }} >> node_joined.txt"
+      args:
+        chdir: $HOME
+        creates: node_joined.txt
