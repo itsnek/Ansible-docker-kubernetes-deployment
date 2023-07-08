@@ -5,17 +5,20 @@
 
 - hosts: all
   become: true
-  name: Docker installation
+  name: Setup server
   vars_files:
-    - default.yml
+    # - variables/users.yml
+    - variables/docker.yml
+  tags: setup_server
 
-  tasks:
+  pre_tasks:
     - name: Install aptitude using apt
       apt: 
         name=aptitude 
         state=latest 
         update_cache=yes 
         force_apt_get=yes
+      tags: aptitude
 
     - name: Install required system packages
       apt: 
@@ -23,132 +26,32 @@
         state=latest 
         update_cache=yes
       loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'net-tools', 'vim' ]
+      tags: apt_installs
 
-    - name: Add Docker GPG apt Key
-      apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        state: present
-
-    - name: Add Docker Repository
-      apt_repository:
-        repo: deb https://download.docker.com/linux/ubuntu bionic stable
-        state: present
+  tasks:
+    - name: Create and setup new users
+      include_vars: variables/users.yml
+      import_tasks: tasks/create-users.yml
+      tags: create_users
 
     - name: Install docker
-      apt:
-        name: "{{item}}"
-        state: latest
-        update_cache: yes
-      loop:
-        - docker-ce
-        - docker-ce-cli
-        - containerd.io
-        
-    - name: Confirm docker is active
-      service:
-        name: docker
-        state: started
-        enabled: yes
-        
+      import_tasks: tasks/docker-installation.yml
+      tags: docker_install
 
-- hosts: all
-  become: true
-  name: Kubernetes installation
-  vars_files: 
-    - default.yml 
-  tasks:
-    - name: add Kubernetes apt-key
-      apt_key:
-        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-        state: present
-
-    - name: add Kubernetes' APT repository
-      apt_repository:
-        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
-        state: present
-        filename: 'kubernetes'
-       
-    - name: install kubelet
-      apt:
-        name: kubelet=1.26.0-00
-        state: present
-        update_cache: true
-
-    - name: install kubeadm
-      apt:
-        name: kubeadm=1.26.0-00
-        state: present
-
-    - name: disable swap
-      shell: swapoff -a
-
-    - name: overwrite config.toml
-      shell: containerd config default > /etc/containerd/config.toml
-
-    - name: restart containerd
-      shell: systemctl restart containerd.service
-
-
+    - name: Install Kubernetes
+      import_tasks: tasks/kubernetes-installation.yml
+      tags: kube_install
+    
 - hosts: master
   become: yes
   gather_facts: false
   name: Initialize and set up the cluster and master node 
+
   tasks:
-    - name: install kubectl
-      apt:
-        name: kubectl=1.26.0-00
-        state: present
-        force: yes 
+    - name: Initialize cluster
+      import_tasks: tasks/init_cluster.yml
+      tags: init_cluster
 
-    # Initialize and set up the cluster and master node 
-    - name: initialize the cluster
-      shell: kubeadm init --pod-network-cidr=10.244.0.0/16 >> cluster_initialized.txt
-      args:
-        chdir: $HOME
-        creates: cluster_initialized.txt
-
-    - name: create .kube directory
-      become: yes
-      become_user: kuser
-      file:
-        path: $HOME/.kube
-        state: directory
-        mode: u=rwx,g=rx,o=rx #0755
- 
-    - name: copy admin.conf to user's kube config
-      copy:
-       src: /etc/kubernetes/admin.conf
-       dest: /home/kuser/.kube/config
-       remote_src: yes
-       owner: kuser
-    
-    - name: Pause for 1 minute to build app cache
-      ansible.builtin.pause:
-        minutes: 1
-    
-    - name: install Pod network
-      become: yes
-      become_user: kuser
-      shell: kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml >> pod_network_setup.txt  # https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml
-      args:
-        chdir: $HOME
-        creates: pod_network_setup.txt
-
-    - name: restart kubelet
-      shell: systemctl restart kubelet.service
-
-    # Create and save join token
-    - name: get join command
-      shell: kubeadm token create --print-join-command
-      register: join_command_raw 
-    
-    - name: set join command
-      set_fact:
-        join_command: "{{ join_command_raw.stdout_lines[0] }}"
-    
-    - name: Store join command
-      action: copy content="{{ join_command }}" dest="/etc/kubernetes/join.command"
-    
 - hosts: worker
   become: yes
   name: Add a worker node in kubernetes cluster
@@ -158,3 +61,4 @@
       args:
         chdir: $HOME
         creates: node_joined.txt
+      tags: add_worker
